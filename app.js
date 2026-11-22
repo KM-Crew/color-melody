@@ -172,7 +172,7 @@ Router.on('/collect', root => {
   }
   function add(hex) {
     if (colors.length >= MAX) { toast(`최대 ${MAX}가지 색까지 담을 수 있어요`); return; }
-    colors.push(hex); saveColors(); renderChips(); vibrate(15);
+    colors.push(hex); saveColors(); renderChips(); vibrate(15); Sfx.play('pop');
     const n = colorToNote(hex); const ac = audio();
     playNote(ac, ac.destination, 'piano', n.freq, ac.currentTime + .01, n.vel, .8);
   }
