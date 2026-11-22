@@ -236,7 +236,7 @@ function composeView(root, list, shared) {
       <h1>${shared ? '누군가 보낸 색의 노래' : '나의 색의 노래'}</h1>
       <div class="score" id="score">${list.map((c, k) => `<div class="tile" data-k="${k}" style="background:${c}"><span>${noteName(colorToNote(c).freq)}</span></div>`).join('')}</div>
       <div class="split"><div class="stack">
-      <button class="btn primary big block" id="play">▶ 연주하기</button>
+      <button class="btn primary big block" id="play" title="Space">▶ 연주하기</button>
       <div class="card stack">
         <div><label class="field">빠르기 <b id="tv">${tempo}</b> BPM</label><input type="range" id="tempo" min="60" max="180" value="${tempo}"></div>
         <div><label class="field">악기</label><div class="row" id="inst">${INSTRUMENTS.map(x => `<button class="chip ${x.id === inst ? 'on' : ''}" data-i="${x.id}">${x.name}</button>`).join('')}</div></div>
@@ -268,12 +268,17 @@ function composeView(root, list, shared) {
     $('#rec').disabled = false; $('#rec').textContent = '⏺ 8초 녹음';
   };
   $('#img').onclick = () => saveImage($('#score'), 'my-color-song.png');
-  return { player, set(t, i) { if (t) { tempo = t; $('#tempo').value = t; $('#tv').textContent = t; } if (i) { inst = i; $$('#inst .chip').forEach(x => x.classList.toggle('on', x.dataset.i === i)); } } };
+  const onKey = e => {
+    if (e.key !== ' ' || /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(e.target.tagName)) return;
+    e.preventDefault(); $('#play').click();                    // 플레이어와 같이 Space로 재생/정지
+  };
+  addEventListener('keydown', onKey);
+  return { player, off: () => removeEventListener('keydown', onKey), set(t, i) { if (t) { tempo = t; $('#tempo').value = t; $('#tv').textContent = t; } if (i) { inst = i; $$('#inst .chip').forEach(x => x.classList.toggle('on', x.dataset.i === i)); } } };
 }
 Router.on('/compose', root => {
   if (colors.length < 3) { Router.go('/collect'); return; }
   const v = composeView(root, colors.slice(), false);
-  return () => v.player.stop();
+  return () => { v.player.stop(); v.off(); };
 });
 Router.on('/play', (root, params) => {
   const list = (params.get('c') || '').split('-').filter(x => /^[0-9a-f]{6}$/i.test(x)).slice(0, MAX).map(x => '#' + x.toLowerCase());
@@ -281,7 +286,7 @@ Router.on('/play', (root, params) => {
   const v = composeView(root, list, true);
   const inst = params.get('i');
   v.set(clamp(Number(params.get('t')) || 108, 60, 180), INSTRUMENTS.some(x => x.id === inst) ? inst : null);
-  return () => v.player.stop();
+  return () => { v.player.stop(); v.off(); };
 });
 
 Router.start($('#app'));
