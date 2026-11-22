@@ -22,3 +22,13 @@
 .tile { flex: 1; height: 110px; border-radius: 12px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 6px; transition: transform .15s ease, height .15s ease; }
 .tile span { font-size: 12px; font-weight: 700; background: rgba(255,255,255,.85); color: #222; border-radius: 6px; padding: 0 5px; }
 .tile.on { height: 140px; transform: translateY(-6px); box-shadow: 0 10px 24px rgba(0,0,0,.18); }
+
+/* ---------- PC 화면 ---------- */
+.pc .hero { text-align: left; }
+.pc .drops { justify-content: flex-start; }
+.pc .how { font-size: 17px; padding: 26px 28px; }
+.pc .cam { max-height: 72vh; }
+.pc .chips { grid-template-columns: repeat(4, 1fr); }
+.pc .score { min-height: 260px; }
+.pc .tile { height: 190px; }
+.pc .tile.on { height: 230px; }

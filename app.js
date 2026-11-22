@@ -120,7 +120,9 @@ function makePlayer(opts) {
 
 /* ---------- 랜딩 ---------- */
 Router.on('/', root => {
-  root.append(h(`
+  const wrap = h('<div class="split center"></div>');
+  root.append(wrap);
+  wrap.append(h(`
     <section class="hero">
       <div class="drops">${['#ff5d73', '#ffb020', '#3ccf91', '#3b82f6', '#a855f7'].map((c, i) => `<i style="background:${c};animation-delay:${i * .18}s"></i>`).join('')}</div>
       <h1>세상의 색을 모아<br>나만의 노래를</h1>
@@ -129,24 +131,26 @@ Router.on('/', root => {
       ${colors.length >= 3 ? '<a class="btn block" href="#/compose" style="margin-top:8px">모아 둔 색으로 연주하기</a>' : ''}
     </section>
     `));
-  root.append(h(`<section class="card how"><b>이렇게 바뀌어요</b><ul><li>색깔(빨강→보라) = 음높이</li><li>밝기 = 옥타브</li><li>선명함 = 소리 크기와 길이</li></ul><p class="muted small">어떤 색을 골라도 듣기 좋은 5음계(펜타토닉)만 써요.</p></section>`));
+  wrap.append(h(`<section class="card how"><b>이렇게 바뀌어요</b><ul><li>색깔(빨강→보라) = 음높이</li><li>밝기 = 옥타브</li><li>선명함 = 소리 크기와 길이</li></ul><p class="muted small">어떤 색을 골라도 듣기 좋은 5음계(펜타토닉)만 써요.</p></section>`));
 });
 
 /* ---------- 색 모으기 ---------- */
 Router.on('/collect', root => {
   root.append(h(`
-    <section class="stack">
+    <section class="split s37">
       <div class="cam">
         <video id="v" playsinline muted></video>
         <canvas id="pic" class="hidden"></canvas>
         <div class="aim"></div>
         <div class="camwait" id="wait">카메라를 켜는 중…</div>
       </div>
+      <div class="stack">
       <div class="row now"><span class="nowc" id="nowc"></span><span id="nowt" class="grow muted">조준점에 색을 맞춰 보세요</span></div>
       <button class="btn primary big block" id="grab">이 색 담기</button>
       <div class="chips" id="chips"></div>
       <div class="row"><label class="btn grow">📷 사진에서 고르기<input type="file" accept="image/*" id="file" hidden></label><label class="btn grow">🎨 직접 고르기<input type="color" id="pickc" class="hidden-color"></label></div>
       <a class="btn block" id="go" href="#/compose">이 색들로 노래 만들기</a>
+      </div>
     </section>`));
   const v = $('#v'), pic = $('#pic');
   const sample = document.createElement('canvas'); sample.width = sample.height = 24;
@@ -231,15 +235,18 @@ function composeView(root, list, shared) {
     <section class="stack">
       <h1>${shared ? '누군가 보낸 색의 노래' : '나의 색의 노래'}</h1>
       <div class="score" id="score">${list.map((c, k) => `<div class="tile" data-k="${k}" style="background:${c}"><span>${noteName(colorToNote(c).freq)}</span></div>`).join('')}</div>
+      <div class="split"><div class="stack">
       <button class="btn primary big block" id="play">▶ 연주하기</button>
       <div class="card stack">
         <div><label class="field">빠르기 <b id="tv">${tempo}</b> BPM</label><input type="range" id="tempo" min="60" max="180" value="${tempo}"></div>
         <div><label class="field">악기</label><div class="row" id="inst">${INSTRUMENTS.map(x => `<button class="chip ${x.id === inst ? 'on' : ''}" data-i="${x.id}">${x.name}</button>`).join('')}</div></div>
         <label class="row small"><input type="checkbox" id="harm" checked> 베이스 화음 넣기</label>
       </div>
+      </div><div class="stack">
       <div class="row"><button class="btn grow" id="share">🔗 노래 링크 공유</button><button class="btn grow" id="rec">⏺ 8초 녹음</button></div>
       <button class="btn grow block" id="img">팔레트 이미지 저장</button>
       <a class="btn ghost block" href="#/collect">${shared ? '나도 색 모으기' : '← 색 다시 고르기'}</a>
+      </div></div>
     </section>`));
   const player = makePlayer({
     colors: () => list, tempo: () => tempo, inst: () => inst, harmony: () => harmony,
