@@ -32,3 +32,30 @@
 .pc .score { min-height: 260px; }
 .pc .tile { height: 190px; }
 .pc .tile.on { height: 230px; }
+
+/* ---------- S8: 배지·사진 대표색·시각화·공유 미리보기 ---------- */
+.badges { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 4px 0 14px; }
+.badges span { font-size: 13px; background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 4px 10px; font-weight: 600; }
+.auto { padding: 12px 14px; }
+.autochips { display: grid; grid-template-columns: repeat(5, minmax(0, 64px)); justify-content: space-between; gap: 8px; margin: 10px 0 6px; }
+.achip { aspect-ratio: 1; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 1px var(--line), 0 4px 10px rgba(0,0,0,.12); cursor: pointer; display: flex; align-items: flex-end; justify-content: center; padding: 0 0 4px; }
+.achip span { font-size: 11px; background: rgba(255,255,255,.85); border-radius: 6px; padding: 0 4px; color: #222; }
+.btn.small { padding: 6px 12px; font-size: 13px; min-height: 0; }
+.score { position: relative; overflow: hidden; }
+.score .tile { position: relative; z-index: 1; }
+.viz { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+.nowplay { text-align: center; min-height: 1.4em; margin-top: -4px; }
+.gift { display: flex; gap: 12px; align-items: center; background: linear-gradient(135deg, #fff, var(--accent-soft)); }
+.gift-ico { font-size: 30px; }
+.songcard { border-radius: 16px; overflow: hidden; border: 1px solid var(--line); background: #fff; }
+.sc-strip { display: flex; height: 96px; }
+.sc-strip i { flex: 1; }
+.sc-body { padding: 12px 14px; display: grid; gap: 4px; }
+.sc-title { font-weight: 800; font-size: 16px; color: #1f1b2e; }
+.sc-notes { font-size: 14px; color: #3b3550; letter-spacing: .02em; }
+.sc-meta { font-size: 13px; color: var(--accent); font-weight: 600; }
+.sc-url { font-size: 12px; color: #8a8599; }
+.reduce-motion .tile { transition: none; }
+.pc .badges { justify-content: flex-start; }
+.pc .autochips { gap: 10px; }
+.pc .sc-strip { height: 120px; }
