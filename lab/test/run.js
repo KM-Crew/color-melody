@@ -109,6 +109,28 @@ const wav = R.wavBytes(pcm, 44100), dv = new DataView(wav.buffer);
 ok('WAV: 머리말 44바이트 + 16비트 모노', wav.length === 44 + 44100 * 2 && String.fromCharCode(...wav.slice(0, 4)) === 'RIFF' && dv.getUint16(22, true) === 1 && dv.getUint32(24, true) === 44100 && dv.getUint16(34, true) === 16 && dv.getUint32(40, true) === 88200);
 ok('WAV: 넘치는 값은 잘라냄', (() => { const w = R.wavBytes(new Float32Array([2, -2, 0]), 8000), v = new DataView(w.buffer); return v.getInt16(44, true) === 32767 && v.getInt16(46, true) === -32767 && v.getInt16(48, true) === 0; })());
 
+/* 10. 공유 링크용 글자열(seedlink.js) — 형식은 docs/prep/BUILD_SPEC.md 5-3절 */
+const L = require(path.join(__dirname, '..', 'seedlink.js'));
+const codes = seeds.map(L.encode);
+ok('링크: 14장 모두 부호화되고 0-9a-z- 만 씀, 80자 이하', codes.every(c => typeof c === 'string' && /^[0-9a-z-]+$/.test(c) && c.length <= 80), `길이 ${Math.min(...codes.map(c => c.length))}~${Math.max(...codes.map(c => c.length))}자`);
+ok('링크: 되돌리면 설정값이 완전히 같음(14장 + 극단 입력)', seeds.every((s, i) => J(L.decode(codes[i])) === J(s)) && [[1, 1], [2, 2], [3, 400], [2000, 20]].every(([w, h]) => { const s = C.toSeed(A.analyze({ data: new Uint8ClampedArray(w * h * 4).fill(200), width: w, height: h })); return J(L.decode(L.encode(s))) === J(s); }));
+ok('링크: 되돌린 설정값으로 만든 곡 = 원래 곡(D)', seeds.every((s, i) => J(C.compose(L.decode(codes[i]), 'D')) === J(songs.D[i])));
+const good = codes[3];
+const bad = ['', 'abc', good.slice(0, -1), good + '0', '2' + good.slice(1), good.replace(/^1./, '1c'), good.slice(0, 12) + '8' + good.slice(13), good.slice(0, 28) + '3' + good.slice(29),
+  good.slice(0, 10) + '3' + good.slice(11), good.toUpperCase(), good.split('-')[0], good + '-ffffff-ffffff-ffffff-ffffff-ffffff', good.replace('-', '%2D'), '<script>', null, 12, {}];
+ok('링크: 깨지거나 손댄 글자열 17종은 모두 null(오류 없이)', bad.every(b => { try { return L.decode(b) === null; } catch (e) { return false; } }));
+ok('링크: 틀린 설정값은 부호화하지 않음', [null, {}, Object.assign({}, seeds[0], { v: 2 }), Object.assign({}, seeds[0], { bpm: 100 }), Object.assign({}, seeds[0], { melody: [1, 2] }), Object.assign({}, seeds[0], { colors: ['zzzzzz'] })].every(s => L.encode(s) === null));
+ok('링크: 되돌린 임의 글자열로도 곡 규칙이 지켜짐(음계 밖 음 0, 15~30초) — 200개', (() => {
+  let st = 7; const r = n => { st = (st * 1664525 + 1013904223) >>> 0; return st % n; };
+  for (let k = 0; k < 200; k++) {
+    const code = '1' + r(12).toString(36) + r(2) + r(5) + r(3) + r(5) + r(3) + r(3) + r(2) + r(3) + (4 + r(8)).toString(36) + r(2) + Array.from({ length: 16 }, () => r(8)).join('') + Array.from({ length: 16 }, () => r(3)).join('') + '-' + Array.from({ length: 1 + r(5) }, () => ('00000' + r(16777216).toString(16)).slice(-6)).join('-');
+    const s = L.decode(code); if (!s) return false;
+    const song = C.compose(s, 'D'), root = C.rootMidi(s), sc = C.SCALE[s.mode].map(x => (root + x) % 12);
+    if (song.seconds < 15 || song.seconds > 30 || !song.events.every(e => e.inst === 'hat' || sc.includes(((e.midi % 12) + 12) % 12))) return false;
+  }
+  return true;
+})());
+
 if (VERBOSE) {
   console.log('\n그림 | 밝기 채도 따뜻함 대비 가장자리 색수 | 조 빠르기 리듬 진행 음역 악기 | D 음표 수');
   feats.forEach((f, i) => { const s = seeds[i]; console.log(`${S.KINDS[i]} | ${f.tone.brightness} ${f.tone.saturation} ${f.tone.warmth} ${f.tone.contrast} ${f.texture.edgeDensity} ${f.palette.length} | ${C.NOTE_EN[s.key]}${s.mode} ${s.bpm} r${s.rhythm} p${s.prog} reg${s.register} ${s.lead} | ${songs.D[i].events.length} | 멜로디 ${s.melody.join('')}`); });

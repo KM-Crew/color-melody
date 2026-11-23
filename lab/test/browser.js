@@ -31,6 +31,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     await page.evaluate(() => [...document.querySelectorAll('#samples button')].find(b => b.textContent === '노을').click());
     const info = await page.evaluate(() => ({ why: document.querySelectorAll('#why li').length, pal: document.querySelectorAll('#palette span').length, seed: JSON.parse(document.querySelector('#seed').textContent), status: document.querySelector('#status').textContent, strip: document.querySelectorAll('#strip div').length }));
     ok(T('노을: 설명 4~5줄·팔레트·설정값·세로줄 16칸 표시'), info.why >= 4 && info.why <= 5 && info.pal >= 1 && info.seed.melody.length === 16 && info.strip === 16, info.status);
+    ok(T('링크용 글자열 표시 → 되돌리면 화면의 설정값과 같음'), await page.evaluate(() => JSON.stringify(LabSeedLink.decode(document.querySelector('#code').textContent)) === document.querySelector('#seed').textContent));
     // node 와 같은 결과인지(같은 픽셀 → 같은 설정값)
     const A = require('../analyze.js'), C = require('../compose.js'), S = require('../samples/make.js');
     ok(T('브라우저와 node 의 설정값이 같음(시험 그림 14장)'), JSON.stringify(await page.evaluate(() => LabSamples.KINDS.map(k => LabCompose.toSeed(LabAnalyze.analyze(LabSamples.makeImage(k)))))) === JSON.stringify(S.KINDS.map(k => C.toSeed(A.analyze(S.makeImage(k))))));
