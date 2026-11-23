@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>P4 기능 점검</title>
+<style>body{font:15px/1.5 system-ui,sans-serif;margin:16px;max-width:720px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #8884;padding:4px 8px;text-align:left;word-break:break-all}button{font:inherit;padding:10px 16px;margin:4px 4px 4px 0}.ok{color:#087443}.no{color:#b3261e}pre{white-space:pre-wrap;word-break:break-all;background:#8881;padding:8px}</style></head>
+<body>
+<h1>P4 기능 점검</h1>
+<p>이 기기·브라우저에서 무엇이 되는지 보여 줍니다. 사진과 소리는 기기 밖으로 나가지 않습니다. 맨 아래 "결과 복사"로 결과를 붙여 넣어 주세요.</p>
+<p><button id="run">① 소리·굽기 점검 (누르면 삑 소리)</button><label><button type="button" id="pickbtn">② 사진 넣기 점검</button><input type="file" accept="image/*" id="file" hidden></label><button id="copy">결과 복사</button></p>
+<table id="t"><tr><th>항목</th><th>결과</th></tr></table>
+<pre id="out"></pre>
+<script>
+// 직접 쓴 점검 코드. 외부 자원 없음.
+const R = {};
+function put(k, v) { R[k] = v; const t = document.getElementById('t'); let tr = document.getElementById('r-' + k);
+  if (!tr) { tr = t.insertRow(); tr.id = 'r-' + k; tr.insertCell().textContent = k; tr.insertCell(); }
+  const s = typeof v === 'string' ? v : JSON.stringify(v); tr.cells[1].textContent = s;
+  tr.cells[1].className = v === true || /^(yes|ok)/.test(s) ? 'ok' : v === false ? 'no' : '';
+  document.getElementById('out').textContent = JSON.stringify(R, null, 1); window.__P4 = R; }
+const AC = window.AudioContext || window.webkitAudioContext;
+const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+function staticChecks() {
+  put('userAgent', navigator.userAgent);
+  put('inApp', (/KAKAOTALK/i.test(navigator.userAgent) ? 'kakaotalk ' : '') + (/Instagram/i.test(navigator.userAgent) ? 'instagram ' : '') + (/NAVER\(inapp/i.test(navigator.userAgent) ? 'naver ' : '') || 'no');
+  put('viewport', innerWidth + 'x' + innerHeight + ' dpr ' + devicePixelRatio);
+  put('AudioContext', !!AC); put('OfflineAudioContext', !!OAC);
+  put('audioSession', 'audioSession' in navigator ? 'yes type=' + navigator.audioSession.type : false);
+  put('MediaRecorder', typeof MediaRecorder !== 'undefined');
+  if (typeof MediaRecorder !== 'undefined') {
+    const types = ['video/mp4', 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/webm', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'audio/mp4', 'audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/wav'];
+    put('recorderTypes', types.filter(t => MediaRecorder.isTypeSupported(t)));
+  }
+  put('canvas.captureStream', !!HTMLCanvasElement.prototype.captureStream);
+  put('share', !!navigator.share); put('canShare', !!navigator.canShare);
+  if (navigator.canShare) {
+    const mk = (n, t) => new File([new Uint8Array(64)], n, { type: t }); const o = {};
+    for (const [n, t] of [['a.wav', 'audio/wav'], ['a.png', 'image/png'], ['a.mp4', 'video/mp4'], ['a.webm', 'video/webm'], ['a.m4a', 'audio/mp4']]) { try { o[n] = navigator.canShare({ files: [mk(n, t)] }); } catch (e) { o[n] = 'err ' + e.name; } }
+    put('canShareFiles', o);
+  }
+  put('clipboard.writeText', !!(navigator.clipboard && navigator.clipboard.writeText));
+  put('a.download', 'download' in document.createElement('a'));
+  put('input.capture', 'capture' in document.createElement('input'));
+  put('hover/pointer', (matchMedia('(hover:hover)').matches ? 'hover ' : 'no-hover ') + (matchMedia('(pointer:coarse)').matches ? 'coarse' : 'fine'));
+  put('dvh', CSS.supports('height', '100dvh')); put('wakeLock', 'wakeLock' in navigator);
+  put('createImageBitmap', typeof createImageBitmap === 'function');
+}
+function wavBytes(buf) { // 16비트 PCM
+  const ch = buf.numberOfChannels, n = buf.length, v = new DataView(new ArrayBuffer(44 + n * ch * 2));
+  const w = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  w(0, 'RIFF'); v.setUint32(4, 36 + n * ch * 2, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, ch, true);
+  v.setUint32(24, buf.sampleRate, true); v.setUint32(28, buf.sampleRate * ch * 2, true); v.setUint16(32, ch * 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * ch * 2, true);
+  for (let i = 0, o = 44; i < n; i++) for (let c = 0; c < ch; c++, o += 2) v.setInt16(o, Math.max(-1, Math.min(1, buf.getChannelData(c)[i])) * 32767, true);
+  return v.buffer; }
+// 곡과 비슷한 부하: 오실레이터 12개 + PeriodicWave + 되먹임 지연 + 컴프레서, 20초
+function graph(ctx, sec) {
+  const comp = ctx.createDynamicsCompressor(); comp.connect(ctx.destination);
+  const dl = ctx.createDelay(1); dl.delayTime.value = 0.25; const fb = ctx.createGain(); fb.gain.value = 0.3; dl.connect(fb); fb.connect(dl); dl.connect(comp);
+  const pw = ctx.createPeriodicWave(new Float32Array([0, 1, 0.5, 0.25, 0.12]), new Float32Array(5));
+  for (let i = 0; i < 12; i++) { const o = ctx.createOscillator(), g = ctx.createGain(); if (i % 2) o.setPeriodicWave(pw); else o.type = 'triangle';
+    o.frequency.value = 110 * Math.pow(2, [0, 3, 7, 10, 12, 15, 19, 22, 24, 27, 31, 34][i] / 12); g.gain.setValueAtTime(0, 0);
+    for (let t = 0; t < sec; t += 0.5) { g.gain.setValueAtTime(0.0001, t + i * 0.01); g.gain.exponentialRampToValueAtTime(0.08, t + 0.02 + i * 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45); }
+    o.connect(g); g.connect(comp); g.connect(dl); o.start(0); o.stop(sec); } }
+function hash(buf) { let h = 2166136261, peak = 0; const d = buf.getChannelData(0); const i32 = new Int32Array(d.buffer, d.byteOffset, d.length);
+  for (let i = 0; i < d.length; i++) { h = Math.imul(h ^ i32[i], 16777619); const a = Math.abs(d[i]); if (a > peak) peak = a; } return { h: (h >>> 0).toString(16), peak: +peak.toFixed(4) }; }
+function render(sec) { return new Promise((res, rej) => { const c = new OAC(2, 44100 * sec, 44100); graph(c, sec); c.oncomplete = e => res(e.renderedBuffer); const p = c.startRendering(); if (p && p.catch) p.catch(rej); }); }
+async function audioChecks() {
+  try {
+    const ctx = new AC(); put('ctx.state(생성 직후)', ctx.state); put('sampleRate', ctx.sampleRate);
+    if (navigator.audioSession) { try { navigator.audioSession.type = 'playback'; put('audioSession=playback', 'ok ' + navigator.audioSession.type); } catch (e) { put('audioSession=playback', 'err ' + e.name); } }
+    await ctx.resume(); put('ctx.state(resume 뒤)', ctx.state);
+    const o = ctx.createOscillator(), g = ctx.createGain(); g.gain.value = 0.2; o.frequency.value = 660; o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.4);
+    document.addEventListener('visibilitychange', () => put('백그라운드 전환 뒤 state', document.visibilityState + ' → ' + ctx.state));
+  } catch (e) { put('AudioContext 오류', String(e)); }
+  try {
+    let t0 = performance.now(); const a = await render(20); const ms = Math.round(performance.now() - t0); const b = await render(20);
+    const ha = hash(a), hb = hash(b);
+    put('굽기 20초 걸린 시간(ms)', ms); put('굽기 2번 결과 같음', ha.h === hb.h); put('굽기 해시·최대 진폭', ha);
+    t0 = performance.now(); const wav = wavBytes(a); put('WAV 만들기(ms, 바이트)', Math.round(performance.now() - t0) + ' / ' + wav.byteLength);
+    const url = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' })); const au = new Audio(url);
+    await new Promise(r => { au.onloadedmetadata = r; au.onerror = r; setTimeout(r, 3000); }); put('WAV를 <audio>로 읽기(초)', isFinite(au.duration) ? +au.duration.toFixed(2) : 'no');
+  } catch (e) { put('굽기 오류', String(e)); }
+}
+function testImage(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); const g = x.createLinearGradient(0, 0, w, h); g.addColorStop(0, '#f80'); g.addColorStop(1, '#208'); x.fillStyle = g; x.fillRect(0, 0, w, h);
+  return new Promise(r => c.toBlob(r, 'image/jpeg', 0.8)); }
+async function shrink(blob) { const t0 = performance.now(); const url = URL.createObjectURL(blob); const img = new Image();
+  await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error('디코드 실패')); img.src = url; });
+  const s = 128 / Math.max(img.naturalWidth, img.naturalHeight); const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(img.naturalWidth * s)); c.height = Math.max(1, Math.round(img.naturalHeight * s));
+  const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0, c.width, c.height); const d = x.getImageData(0, 0, c.width, c.height).data; URL.revokeObjectURL(url);
+  return { natural: img.naturalWidth + 'x' + img.naturalHeight, small: c.width + 'x' + c.height, ms: Math.round(performance.now() - t0), firstPx: [d[0], d[1], d[2], d[3]] }; }
+async function imageChecks() { try { const b = await testImage(4000, 3000); put('4000x3000 만들기(바이트)', b ? b.size : false); if (b) put('4000x3000 디코드+축소', await shrink(b)); } catch (e) { put('큰 그림 오류', String(e)); } }
+document.getElementById('run').onclick = audioChecks;
+document.getElementById('pickbtn').onclick = () => document.getElementById('file').click();
+document.getElementById('file').onchange = async e => { const f = e.target.files[0]; if (!f) return; put('고른 파일', { name: f.name, type: f.type, size: f.size }); try { put('고른 사진 디코드+축소', await shrink(f)); } catch (er) { put('고른 사진 디코드+축소', String(er)); } };
+document.getElementById('copy').onclick = async () => { const s = JSON.stringify(R, null, 1); try { await navigator.clipboard.writeText(s); put('복사', 'ok'); } catch (e) { put('복사', '실패 — 아래 글자를 길게 눌러 복사'); } };
+addEventListener('paste', async e => { const f = [...(e.clipboardData && e.clipboardData.files || [])][0]; put('붙여넣기 파일', f ? { type: f.type, size: f.size } : 'no file'); });
+addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer.files[0]; put('끌어다 놓기 파일', f ? { type: f.type, size: f.size } : 'no file'); });
+staticChecks(); imageChecks();
+</script></body></html>
