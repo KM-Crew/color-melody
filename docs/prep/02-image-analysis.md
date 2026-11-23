@@ -8,7 +8,7 @@
 
 ## 제작에 주는 결론
 
-- **입력 처리 순서(고정):** 파일 → `<img>` 로 디코드 → 긴 변 128 캔버스에 `drawImage`(여기서 EXIF 회전이 적용됨) → `getImageData` → 분석. 화면에 보여 줄 그림은 따로 긴 변 1280 이하로 그린다. 원본 크기 캔버스는 만들지 않는다(iOS 메모리 한도, 5절).
+- **입력 처리 순서(고정):** 파일 → `<img>` 로 디코드 → 긴 변 128 캔버스에 `drawImage`(여기서 EXIF 회전이 적용됨) → `getImageData` → 분석. **(P5에서 바뀜: 긴 변 512 → 128 두 번에 줄인다. 1단계와 멜로디 1칸 차이가 실측됨 — [lab/README](../../lab/README.md), [BUILD_SPEC](BUILD_SPEC.md) 4-1절)** 화면에 보여 줄 그림은 따로 긴 변 1280 이하로 그린다. 원본 크기 캔버스는 만들지 않는다(iOS 메모리 한도, 5절).
 - **팔레트는 지금 `app.js`의 "칸 묶기" 방식을 유지**하고 비율(`share`)을 추가한다. 중앙값 분할·k-평균보다 50~75배 빠르고(실측), "선명한 색을 우선"하는 점이 음악용으로 맞다. 단 색 수가 5개보다 적게 나올 수 있으므로 작곡 쪽이 1~5색을 모두 받아야 한다.
 - **필수 특징 7묶음:** 팔레트+비율 / 밝기 / 대비 / 채도 / 따뜻함 / 가장자리 밀도 / 세로줄 16개 스캔. **선택:** 3×3 칸 평균, 눈에 띄는 곳, 색 풍부함, 회색조 여부(7절).
 - **분석 결과는 숫자를 반올림해서** 내보낸다(소수 3자리). 브라우저마다 축소 결과가 조금 달라도 같은 음악이 나오게 하려면 작곡 단계에서 값을 **구간으로 나눠** 쓴다(예: 밝기 5단계). → P3·P5에 넘김.
@@ -125,7 +125,7 @@
 
 | 상황 | 처리 | 근거·확인 상태 |
 |---|---|---|
-| **큰 사진** | 분석용: 긴 변 128로 `drawImage`. 표시용: 긴 변 1280 이하. 원본 크기 캔버스는 만들지 않음 | iOS Safari 캔버스는 넓이 16,777,216픽셀(=4096×4096) 한도와 전체 캔버스 메모리 한도(보고된 값 224~384MB, 버전·기기마다 다름)가 따로 있다([pqina 1](https://pqina.nl/blog/canvas-area-exceeds-the-maximum-limit/), [pqina 2](https://www.pqina.nl/blog/total-canvas-memory-use-exceeds-the-maximum-limit/)). 2024년에 한도를 8192×8192로 올리는 WebKit 변경이 처리됐으나 적용 버전은 확인 못 함([WebKit 271002](https://bugs.webkit.org/show_bug.cgi?id=271002)). 4000×3000(1200만 픽셀)은 한도 안이지만 `<img>` 디코드 자체가 메모리를 쓴다 |
+| **큰 사진** | 분석용: 긴 변 128로 `drawImage`(P5에서 512 → 128 2단계로 확정, 아래 줄). 표시용: 긴 변 1280 이하. 원본 크기 캔버스는 만들지 않음 | iOS Safari 캔버스는 넓이 16,777,216픽셀(=4096×4096) 한도와 전체 캔버스 메모리 한도(보고된 값 224~384MB, 버전·기기마다 다름)가 따로 있다([pqina 1](https://pqina.nl/blog/canvas-area-exceeds-the-maximum-limit/), [pqina 2](https://www.pqina.nl/blog/total-canvas-memory-use-exceeds-the-maximum-limit/)). 2024년에 한도를 8192×8192로 올리는 WebKit 변경이 처리됐으나 적용 버전은 확인 못 함([WebKit 271002](https://bugs.webkit.org/show_bug.cgi?id=271002)). 4000×3000(1200만 픽셀)은 한도 안이지만 `<img>` 디코드 자체가 메모리를 쓴다 |
 | 한 번에 크게 줄일 때 품질 | 4000→128처럼 30배 줄이면 브라우저 보간 방식에 따라 잡음이 남을 수 있다. 대책: 먼저 긴 변 512로 줄이고 다시 128로(2단계) | 브라우저별 차이는 확인 못 함. P5에서 1단계/2단계 결과를 비교해 정할 것 |
 | **EXIF 회전**(세로로 찍은 사진) | 별도 코드 없이 `<img>` → `drawImage` 로 처리. EXIF 파서 라이브러리를 넣지 않는다 | CSS `image-orientation` 기본값이 `from-image`이고 2020년 4월 이후 주요 브라우저 공통([MDN](https://developer.mozilla.org/docs/Web/CSS/image-orientation), 검색 요약 기준). 크롬 81·사파리 13.1에서 캔버스에도 적용된다는 표가 CSS 작업 그룹 메일에 있다([W3C 메일](https://lists.w3.org/Archives/Public/public-css-archive/2020Apr/0170.html)). 파이어폭스 적용 버전은 확인 못 함. **주의:** 그림·캔버스가 문서에 붙어 있지 않을 때 브라우저마다 결과가 다를 수 있다는 보고가 있다([W3C 메일](https://lists.w3.org/Archives/Public/public-css-archive/2020Jan/0244.html)) → P4 실기기 점검표에 "세로 사진이 누워 보이지 않는지" 항목 |
 | `createImageBitmap` 로 디코드+축소 | **쓰지 않는다**(`<img>` 경로 하나로 통일) | 회전 옵션 이름이 `none`→`from-image`로 바뀐 이력이 있고 Safari 지원이 불분명하다([caniuse](https://caniuse.com/mdn-api_createimagebitmap_options_imageorientation_parameter_from-image), [WebKit 250476](https://bugs.webkit.org/show_bug.cgi?id=250476)). 확인 못 함 |
@@ -196,7 +196,7 @@ P5 `lab/analyze.js` 가 돌려줄 모양. 숫자는 예시다(실제 사진의 �
 - 모든 소수는 **3자리 반올림**(벤치에서 단색 그림의 대비가 0이 아니라 1.3e-7 로 나왔다 — 반올림하지 않으면 이런 값이 분기를 흔든다).
 - 팔레트 순서는 비율 큰 순, 비율이 같으면 색상(h) 작은 순 → 결정적.
 - 팔레트가 0개인 경우(전부 투명)는 `mostlyTransparent` 처리 후 다시 계산하므로 결과에는 항상 1개 이상.
-- 공유 링크에 다 넣기엔 크다(특히 `columns`). 링크용 축약 형식은 P3에서 작곡에 실제로 쓰는 값이 정해진 뒤 P6에서 정한다.
+- 공유 링크에 다 넣기엔 크다(특히 `columns`). 링크용 축약 형식은 P3에서 작곡에 실제로 쓰는 값이 정해진 뒤 P6에서 정한다. → **정해짐:** 특징이 아니라 곡 설정값을 51~79자 글자열로 담는다(`lab/seedlink.js`, [BUILD_SPEC](BUILD_SPEC.md) 5-3절).
 
 ## 7. MVP 특징 묶음
 
